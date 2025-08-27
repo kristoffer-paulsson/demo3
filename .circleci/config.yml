@@ -10,32 +10,16 @@ jobs:
       # Restore caches
       - restore_cache:
           keys:
-            - gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}-{{ .Environment.OS_NAME }}
-            - gradle-wrapper-v1-
+            - gradle-cache-v1
       - restore_cache:
           keys:
-            - gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
-            - gradle-deps-v1-
+            - maven-v1
       - restore_cache:
           keys:
-            - maven-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
-            - maven-v1-
+            - konan-cache-v1
       - restore_cache:
           keys:
-            - konan-cache-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
-            - konan-cache-v1-
-      - restore_cache:
-          keys:
-            - android-cache-v1-{{ .Environment.OS_NAME }}
-            - android-cache-v1-
-      - restore_cache:
-          keys:
-            - cocoapods-cache-v1-{{ checksum "gradle.properties" }}
-            - cocoapods-cache-v1-
-      - restore_cache:
-          keys:
-            - npm-cache-v1-{{ checksum "gradle.properties" }}
-            - npm-cache-v1-
+            - android-cache-v1
 
       # Ensure Gradle wrapper exists
       - run:
@@ -74,43 +58,24 @@ jobs:
 
       # Kotlin/Native
       - save_cache:
-          key: konan-cache-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
+          key: konan-cache-v1
           paths:
-            - ~/.konan/dependencies/cache
-            #- ~/.konan/klib
-            #- ~/.konan/konan
+            - ~/.konan
 
       # Gradle wrapper and dependencies
       - save_cache:
-          key: gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}-{{ .Environment.OS_NAME }}
+          key: gradle-cache-v1
           paths:
-            - ~/.gradle/wrapper/dists
-      - save_cache:
-          key: gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
-          paths:
-            - ~/.gradle/caches/modules-2/files-2.1
+            - ~/.gradle
 
       # Maven
       - save_cache:
-          key: maven-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
+          key: maven-v1
           paths:
             - ~/.m2/repository
 
       # Android
       - save_cache:
-          key: android-cache-v1-{{ .Environment.OS_NAME }}
+          key: android-cache-v1
           paths:
             - ~/.android/cache
-
-      # CocoaPods (macOS only)
-      - save_cache:
-          key: cocoapods-cache-v1-{{ checksum "gradle.properties" }}
-          paths:
-            - ~/Library/Caches/CocoaPods
-
-      # Kotlin/JS npm caches
-      - save_cache:
-          key: npm-cache-v1-{{ checksum "gradle.properties" }}
-          paths:
-            # - ~/.npm
-            - ~/.gradle/caches/npm
