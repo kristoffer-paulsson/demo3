@@ -1,19 +1,9 @@
-version: 2.1
-
 jobs:
   build:
     docker:
       - image: cimg/android:2025.08
     steps:
       - checkout
-
-      # Install system Gradle (only needed if wrapper jar is missing)
-      - run:
-          name: Install Gradle (fallback only)
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y gradle
-            gradle --version
 
       # Restore caches
       - restore_cache:
@@ -29,17 +19,21 @@ jobs:
             - maven-v1-{{ checksum "gradle.properties" }}
             - maven-v1-
 
-      # Ensure wrapper exists
+      # Ensure Gradle Wrapper exists (bootstrap from distributionUrl if missing)
       - run:
           name: Ensure Gradle Wrapper
           command: |
             if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
-              echo "Gradle wrapper missing — regenerating..."
-              gradle wrapper
+              echo "Gradle wrapper missing — bootstrapping from distributionUrl..."
+              DIST_URL=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties | cut -d'=' -f2)
+              curl -sL "$DIST_URL" -o gradle.zip
+              unzip -q gradle.zip -d gradle-dist
+              GRADLE_BIN=$(find gradle-dist -type f -path "*/bin/gradle" | head -n1)
+              $GRADLE_BIN wrapper
             fi
             chmod +x ./gradlew
 
-      # Build using wrapper (downloads exact version from gradle-wrapper.properties)
+      # Build using wrapper (downloads exact version defined in properties)
       - run: ./gradlew assembleDist
 
       # Save caches
