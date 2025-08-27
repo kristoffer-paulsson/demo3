@@ -1,13 +1,45 @@
+version: 2.1
+
 jobs:
   build:
     docker:
       - image: cimg/android:2025.08
     steps:
       - checkout
+
+      # Restore caches (if available)
+      - restore_cache:
+          keys:
+            # Reuse cache when exact Gradle dependencies match
+            - gradle-v1-{{ checksum "gradle.properties" }}-{{ checksum "build.gradle.kts" }}
+            # Fallbacks
+            - gradle-v1-
+
+      - restore_cache:
+          keys:
+            - maven-v1-{{ checksum "gradle.properties" }}
+            - maven-v1-
+
       - run: ./gradlew assembleDist
+
+      # Save Gradle / Maven / Android / Kotlin Native caches
       - save_cache:
+          key: gradle-v1-{{ checksum "gradle.properties" }}-{{ checksum "build.gradle.kts" }}
+          paths:
+            - ~/.gradle/caches
+            - ~/.gradle/wrapper
+
+      - save_cache:
+          key: maven-v1-{{ checksum "gradle.properties" }}
           paths:
             - ~/.m2
-            - ~/.gradle
+
+      - save_cache:
+          key: android-v1
+          paths:
             - ~/.android
+
+      - save_cache:
+          key: konan-v1
+          paths:
             - ~/.konan
