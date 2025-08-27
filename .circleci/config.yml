@@ -7,38 +7,58 @@ jobs:
     steps:
       - checkout
 
-      # Restore caches (if available)
+      # Install system Gradle (only needed if wrapper jar is missing)
+      - run:
+          name: Install Gradle (fallback only)
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gradle
+            gradle --version
+
+      # Restore caches
       - restore_cache:
           keys:
-            # Reuse cache when exact Gradle dependencies match
-            - gradle-v1-{{ checksum "gradle.properties" }}-{{ checksum "build.gradle.kts" }}
-            # Fallbacks
-            - gradle-v1-
-
+            - gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+            - gradle-wrapper-v1-
+      - restore_cache:
+          keys:
+            - gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}
+            - gradle-deps-v1-
       - restore_cache:
           keys:
             - maven-v1-{{ checksum "gradle.properties" }}
             - maven-v1-
 
+      # Ensure wrapper exists
+      - run:
+          name: Ensure Gradle Wrapper
+          command: |
+            if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
+              echo "Gradle wrapper missing — regenerating..."
+              gradle wrapper
+            fi
+            chmod +x ./gradlew
+
+      # Build using wrapper (downloads exact version from gradle-wrapper.properties)
       - run: ./gradlew assembleDist
 
-      # Save Gradle / Maven / Android / Kotlin Native caches
+      # Save caches
       - save_cache:
-          key: gradle-v1-{{ checksum "gradle.properties" }}-{{ checksum "build.gradle.kts" }}
+          key: gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          paths:
+            - ~/.gradle/wrapper/dists
+      - save_cache:
+          key: gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}
           paths:
             - ~/.gradle/caches
-            - ~/.gradle/wrapper
-
       - save_cache:
           key: maven-v1-{{ checksum "gradle.properties" }}
           paths:
             - ~/.m2
-
       - save_cache:
           key: android-v1
           paths:
             - ~/.android
-
       - save_cache:
           key: konan-v1
           paths:
