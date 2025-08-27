@@ -4,7 +4,7 @@ jobs:
       - image: cimg/android:2025.08
     steps:
       - checkout
-      - run: ./gradlew build
+      - run: ./gradlew assembleDist
       - save_cache:
           paths:
             - ~/.m2
