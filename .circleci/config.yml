@@ -19,21 +19,36 @@ jobs:
             - maven-v1-{{ checksum "gradle.properties" }}
             - maven-v1-
 
-      # Ensure Gradle Wrapper exists (bootstrap from distributionUrl if missing)
+      # Bootstrap Gradle wrapper if missing
       - run:
           name: Ensure Gradle Wrapper
           command: |
             if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
-              echo "Gradle wrapper missing — bootstrapping from distributionUrl..."
-              DIST_URL=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties | cut -d'=' -f2)
-              curl -sL "$DIST_URL" -o gradle.zip
-              unzip -q gradle.zip -d gradle-dist
+              echo "Gradle wrapper missing — bootstrapping..."
+
+              # Scan properties for exact version number
+              VERSION_LINE=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties)
+              GRADLE_VERSION=$(echo $VERSION_LINE | sed -E 's/.*gradle-([0-9.]+)-bin\.zip/\1/')
+              echo "Detected Gradle version: $GRADLE_VERSION"
+
+              # Build full distribution URL dynamically
+              DIST_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-all.zip"
+              echo "Downloading $DIST_URL"
+
+              # Download and unzip
+              curl -sL "$DIST_URL" -o gradle-all.zip
+              unzip -q gradle-all.zip -d gradle-dist
+
+              # Find gradle binary
               GRADLE_BIN=$(find gradle-dist -type f -path "*/bin/gradle" | head -n1)
-              $GRADLE_BIN wrapper
+
+              # Regenerate wrapper using downloaded Gradle
+              $GRADLE_BIN wrapper --gradle-version $GRADLE_VERSION --distribution-type all
             fi
+
             chmod +x ./gradlew
 
-      # Build using wrapper (downloads exact version defined in properties)
+      # Build
       - run: ./gradlew assembleDist
 
       # Save caches
