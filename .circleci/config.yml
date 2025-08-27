@@ -5,3 +5,9 @@ jobs:
     steps:
       - checkout
       - run: ./gradlew build
+      - save_cache:
+          paths:
+            - ~/.m2
+            - ~/.gradle
+            - ~/.android
+            - ~/.konan
