@@ -18,6 +18,10 @@ jobs:
           keys:
             - maven-v1-{{ checksum "gradle.properties" }}
             - maven-v1-
+      - restore_cache:
+          keys:
+            - konan-v1-{{ checksum "gradle.properties" }}
+            - konan-v1-
 
       # Bootstrap Gradle wrapper if missing
       - run:
@@ -25,31 +29,34 @@ jobs:
           command: |
             if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
               echo "Gradle wrapper missing — bootstrapping..."
-
+            
               # Scan properties for exact version number
               VERSION_LINE=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties)
               GRADLE_VERSION=$(echo $VERSION_LINE | sed -E 's/.*gradle-([0-9.]+)-bin\.zip/\1/')
               echo "Detected Gradle version: $GRADLE_VERSION"
 
-              # Build full distribution URL dynamically
-              DIST_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-all.zip"
-              echo "Downloading $DIST_URL"
+              # Path in cache
+              GRADLE_CACHE_DIR="$HOME/.gradle/wrapper/dists/gradle-${GRADLE_VERSION}-all"
 
-              # Download and unzip
-              curl -sL "$DIST_URL" -o gradle-all.zip
-              unzip -q gradle-all.zip -d gradle-dist
+              if [ ! -d "$GRADLE_CACHE_DIR" ]; then
+                echo "Gradle $GRADLE_VERSION not found in cache — downloading..."
+                DIST_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-all.zip"
+                curl -sL "$DIST_URL" -o gradle-all.zip
+                unzip -q gradle-all.zip -d gradle-dist
+                GRADLE_BIN=$(find gradle-dist -type f -path "*/bin/gradle" | head -n1)
+              else
+                echo "Using cached Gradle $GRADLE_VERSION"
+                GRADLE_BIN=$(find "$GRADLE_CACHE_DIR" -type f -path "*/bin/gradle" | head -n1)
+              fi
 
-              # Find gradle binary
-              GRADLE_BIN=$(find gradle-dist -type f -path "*/bin/gradle" | head -n1)
-
-              # Regenerate wrapper using downloaded Gradle
+              # Generate wrapper using the Gradle binary
               $GRADLE_BIN wrapper --gradle-version $GRADLE_VERSION --distribution-type all
             fi
 
             chmod +x ./gradlew
 
       # Build
-      - run: ./gradlew build
+      - run: ./gradlew assembleDist
 
       # Save caches
       - save_cache:
@@ -69,6 +76,6 @@ jobs:
           paths:
             - ~/.android
       - save_cache:
-          key: konan-v1
+          key: konan-v1-{{ checksum "gradle.properties" }}
           paths:
             - ~/.konan
