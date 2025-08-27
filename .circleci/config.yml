@@ -49,7 +49,7 @@ jobs:
             chmod +x ./gradlew
 
       # Build
-      - run: ./gradlew assembleDist
+      - run: ./gradlew build
 
       # Save caches
       - save_cache:
