@@ -1,43 +1,56 @@
+version: 2.1
+
 jobs:
   build:
     docker:
-      - image: cimg/android:2025.08
+      - image: cimg/android:2025.08  # Use appropriate image per OS
     steps:
       - checkout
 
       # Restore caches
       - restore_cache:
           keys:
-            - gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+            - gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}-{{ .Environment.OS_NAME }}
             - gradle-wrapper-v1-
       - restore_cache:
           keys:
-            - gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}
+            - gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
             - gradle-deps-v1-
       - restore_cache:
           keys:
-            - maven-v1-{{ checksum "gradle.properties" }}
+            - maven-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
             - maven-v1-
       - restore_cache:
           keys:
-            - konan-v1-{{ checksum "gradle.properties" }}
-            - konan-v1-
+            - konan-cache-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
+            - konan-cache-v1-
+      - restore_cache:
+          keys:
+            - android-cache-v1-{{ .Environment.OS_NAME }}
+            - android-cache-v1-
+      - restore_cache:
+          keys:
+            - cocoapods-cache-v1-{{ checksum "gradle.properties" }}
+            - cocoapods-cache-v1-
+      - restore_cache:
+          keys:
+            - npm-cache-v1-{{ checksum "gradle.properties" }}
+            - npm-cache-v1-
 
-      # Bootstrap Gradle wrapper if missing
+      # Ensure Gradle wrapper exists
       - run:
           name: Ensure Gradle Wrapper
           command: |
             if [ ! -f "./gradlew" ] || [ ! -f "./gradle/wrapper/gradle-wrapper.jar" ]; then
               echo "Gradle wrapper missing — bootstrapping..."
             
-              # Scan properties for exact version number
+              # Detect Gradle version from properties
               VERSION_LINE=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties)
               GRADLE_VERSION=$(echo $VERSION_LINE | sed -E 's/.*gradle-([0-9.]+)-bin\.zip/\1/')
               echo "Detected Gradle version: $GRADLE_VERSION"
 
-              # Path in cache
+              # Check cached Gradle
               GRADLE_CACHE_DIR="$HOME/.gradle/wrapper/dists/gradle-${GRADLE_VERSION}-all"
-
               if [ ! -d "$GRADLE_CACHE_DIR" ]; then
                 echo "Gradle $GRADLE_VERSION not found in cache — downloading..."
                 DIST_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-all.zip"
@@ -49,33 +62,55 @@ jobs:
                 GRADLE_BIN=$(find "$GRADLE_CACHE_DIR" -type f -path "*/bin/gradle" | head -n1)
               fi
 
-              # Generate wrapper using the Gradle binary
+              # Generate wrapper
               $GRADLE_BIN wrapper --gradle-version $GRADLE_VERSION --distribution-type all
             fi
-
             chmod +x ./gradlew
 
       # Build
       - run: ./gradlew assembleDist
 
       # Save caches
+
+      # Kotlin/Native
       - save_cache:
-          key: gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          key: konan-cache-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
+          paths:
+            - ~/.konan/dependencies/cache
+            #- ~/.konan/klib
+            #- ~/.konan/konan
+
+      # Gradle wrapper and dependencies
+      - save_cache:
+          key: gradle-wrapper-v1-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}-{{ .Environment.OS_NAME }}
           paths:
             - ~/.gradle/wrapper/dists
       - save_cache:
-          key: gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}
+          key: gradle-deps-v1-{{ checksum "build.gradle.kts" }}-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
           paths:
-            - ~/.gradle/caches
+            - ~/.gradle/caches/modules-2/files-2.1
+
+      # Maven
       - save_cache:
-          key: maven-v1-{{ checksum "gradle.properties" }}
+          key: maven-v1-{{ checksum "gradle.properties" }}-{{ .Environment.OS_NAME }}
           paths:
-            - ~/.m2
+            - ~/.m2/repository
+
+      # Android
       - save_cache:
-          key: android-v1
+          key: android-cache-v1-{{ .Environment.OS_NAME }}
           paths:
-            - ~/.android
+            - ~/.android/cache
+
+      # CocoaPods (macOS only)
       - save_cache:
-          key: konan-v1-{{ checksum "gradle.properties" }}
+          key: cocoapods-cache-v1-{{ checksum "gradle.properties" }}
           paths:
-            - ~/.konan
+            - ~/Library/Caches/CocoaPods
+
+      # Kotlin/JS npm caches
+      - save_cache:
+          key: npm-cache-v1-{{ checksum "gradle.properties" }}
+          paths:
+            # - ~/.npm
+            - ~/.gradle/caches/npm
